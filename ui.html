@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <style>
+    :root {
+      --figma-blue: #18a0fb;
+      --figma-red: #f24822;
+      --figma-green: #198754;
+      --figma-bg-hover: #eef5ff;
+      --figma-grey: #f5f5f5;
+      --figma-border: #e6e6e6;
+      --figma-text: #333333;
+    }
+
+    body { 
+      font-family: "Inter", sans-serif; 
+      margin: 0; 
+      padding: 16px; 
+      display: flex; 
+      flex-direction: column; 
+      height: 100vh;
+      color: var(--figma-text);
+      box-sizing: border-box;
+    }
+
+    /* --- KPIs (Même style que l'Audit) --- */
+    .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+    .kpi-card { background: var(--figma-grey); padding: 12px 4px; border-radius: 6px; text-align: center; border: 1px solid var(--figma-border); }
+    .kpi-value { font-size: 18px; font-weight: bold; display: block; }
+    .kpi-label { font-size: 9px; color: #666; text-transform: uppercase; margin-top: 4px; display: block; letter-spacing: 0.5px; }
+
+    /* --- TABS --- */
+    .tabs { display: flex; border-bottom: 1px solid var(--figma-border); margin-bottom: 16px; }
+    .tab { 
+      padding: 8px 12px; cursor: pointer; font-size: 12px; font-weight: 600; color: #999;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .tab.active { color: var(--figma-blue); border-bottom: 2px solid var(--figma-blue); }
+
+    /* --- CONTENT AREA --- */
+    .tab-content { display: none; flex-direction: column; gap: 12px; }
+    .tab-content.active { display: flex; }
+
+    /* --- JSON PREVIEW --- */
+    #json-container {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: "Roboto Mono", monospace;
+      font-size: 11px;
+      height: 280px;
+      overflow: auto;
+      margin: 0;
+      white-space: pre-wrap;
+      border: 1px solid #333;
+    }
+
+    /* --- FORM STYLES --- */
+    .field-group { margin-bottom: 12px; }
+    label { display: block; font-size: 10px; font-weight: bold; color: #777; margin-bottom: 4px; text-transform: uppercase; }
+    input { 
+      width: 100%; 
+      padding: 8px; 
+      border: 1px solid var(--figma-border); 
+      border-radius: 4px; 
+      font-size: 12px; 
+      box-sizing: border-box;
+      background: white;
+    }
+    input:focus { border-color: var(--figma-blue); outline: none; }
+
+    /* --- BUTTONS --- */
+    .btn-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    button {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity 0.2s;
+    }
+
+    .primary { background: var(--figma-blue); color: white; }
+    .secondary { background: var(--figma-green); color: white; }
+    .ghost { background: white; border: 1px solid var(--figma-border); color: var(--figma-text); }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .status-msg { font-size: 11px; margin-top: 8px; text-align: center; min-height: 16px; }
+    
+    /* Stats Badge */
+    .badge-sync {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #e0e7ff;
+      color: #3730a3;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <span class="kpi-value" id="stats-count">0</span>
+      <span class="kpi-label">Variables</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-value" id="stats-time">--:--</span>
+      <span class="kpi-label">Dernière Sync</span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-btn-tokens" onclick="switchTab('tokens')">Extraction</div>
+    <div class="tab" id="tab-btn-settings" onclick="switchTab('settings')">Config Git</div>
+  </div>
+
+  <div id="content-tokens" class="tab-content active">
+    <pre id="json-container">Initialisation...</pre>
+    
+    <div class="btn-stack">
+      <button id="copy-btn" class="ghost" disabled>
+        <span class="material-icons-outlined">content_copy</span> Copier le JSON
+      </button>
+      <button id="push-btn" class="primary" disabled>
+        <span class="material-icons-outlined">cloud_upload</span> Pousser sur GitHub
+      </button>
+    </div>
+    <div id="status-tokens" class="status-msg"></div>
+  </div>
+
+  <div id="content-settings" class="tab-content">
+    <div class="field-group">
+      <label>GitHub Personal Access Token</label>
+      <input type="password" id="git-token" placeholder="ghp_xxxxxxxxxxxx">
+    </div>
+    <div class="field-group">
+      <label>Dépôt (owner/repo)</label>
+      <input type="text" id="git-repo" placeholder="ocsin/design-system">
+    </div>
+    <div class="field-group">
+      <label>Chemin du fichier</label>
+      <input type="text" id="git-path" value="tokens/design-tokens.json">
+    </div>
+    <div class="field-group">
+      <label>Branche</label>
+      <input type="text" id="git-branch" value="main">
+    </div>
+
+    <button id="test-btn" class="ghost">
+      <span class="material-icons-outlined">check_circle</span> Tester la connexion
+    </button>
+    <div id="status-settings" class="status-msg"></div>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      document.getElementById('tab-btn-' + tabId).classList.add('active');
+      document.getElementById('content-' + tabId).classList.add('active');
+    }
+
+    const jsonContainer = document.getElementById('json-container');
+    const copyBtn = document.getElementById('copy-btn');
+    const pushBtn = document.getElementById('push-btn');
+    let currentPayload = null;
+
+    window.onload = () => {
+      parent.postMessage({ pluginMessage: { type: 'UI_READY' } }, '*');
+    };
+
+    window.onmessage = (event) => {
+      const { type, payload, stats } = event.data.pluginMessage;
+
+      if (type === 'TOKENS_EXTRACTED') {
+        currentPayload = payload;
+        jsonContainer.textContent = JSON.stringify(payload, null, 2);
+        
+        document.getElementById('stats-count').innerText = stats.count;
+        document.getElementById('stats-time').innerText = stats.time;
+
+        copyBtn.disabled = false;
+        pushBtn.disabled = false;
+      }
+    };
+
+    copyBtn.onclick = () => {
+      const el = document.createElement('textarea');
+      el.value = jsonContainer.textContent;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      
+      const originalHtml = copyBtn.innerHTML;
+      copyBtn.innerHTML = '<span class="material-icons-outlined">done</span> Copié !';
+      setTimeout(() => { copyBtn.innerHTML = originalHtml; }, 2000);
+    };
+
+    // --- LOGIQUE GIT ---
+    document.getElementById('test-btn').onclick = async () => {
+      const token = document.getElementById('git-token').value;
+      const repo = document.getElementById('git-repo').value;
+      const status = document.getElementById('status-settings');
+      
+      status.innerHTML = "⏳ Vérification...";
+      try {
+        const res = await fetch(`https://api.github.com/repos/${repo}`, {
+          headers: { 'Authorization': `token ${token}` }
+        });
+        if (res.ok) {
+          status.innerHTML = `<span style="color:var(--figma-green)">✅ Connexion réussie !</span>`;
+        } else {
+          status.innerHTML = `<span style="color:var(--figma-red)">❌ Erreur de configuration.</span>`;
+        }
+      } catch (e) {
+        status.innerHTML = `<span style="color:var(--figma-red)">❌ Erreur réseau.</span>`;
+      }
+    };
+
+    pushBtn.onclick = async () => {
+      const token = document.getElementById('git-token').value;
+      const repo = document.getElementById('git-repo').value;
+      const path = document.getElementById('git-path').value;
+      const branch = document.getElementById('git-branch').value;
+      const content = jsonContainer.textContent;
+      const status = document.getElementById('status-tokens');
+
+      if (!token || !repo || !currentPayload) {
+        status.innerHTML = `<span style="color:var(--figma-red)">❌ Config incomplète.</span>`;
+        return;
+      }
+
+      status.innerHTML = "⏳ Push en cours...";
+
+      try {
+        let sha = "";
+        const getFile = await fetch(`https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`, {
+          headers: { 'Authorization': `token ${token}` }
+        });
+
+        if (getFile.ok) {
+          const fileData = await getFile.json();
+          sha = fileData.sha;
+        }
+
+        const putResponse = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `token ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: "🎨 GE-Design : Mise à jour automatique des tokens",
+            content: btoa(unescape(encodeURIComponent(content))),
+            sha: sha || undefined,
+            branch: branch
+          })
+        });
+
+        if (putResponse.ok) {
+          status.innerHTML = `<span style="color:var(--figma-green)">✅ Tokens mis à jour sur GitHub !</span>`;
+        } else {
+          status.innerHTML = `<span style="color:var(--figma-red)">❌ Échec du push.</span>`;
+        }
+      } catch (error) {
+        status.innerHTML = `<span style="color:var(--figma-red)">❌ Erreur réseau.</span>`;
+      }
+    };
+  </script>
+</body>
+</html>
